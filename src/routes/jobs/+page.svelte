@@ -21,11 +21,13 @@
   let files = [];
 
   /**
-     * @param {{ target: { files: Iterable<any> | ArrayLike<any>; }; }} event
+     * @param {Event} event
      */
 
   async function handleFileChange(event) {
-    const selectedFiles = Array.from(event.target.files);
+    const input = /** @type {HTMLInputElement} */ (event.currentTarget);
+    if (!input.files) return;
+    const selectedFiles = Array.from(input.files);
     files = selectedFiles.map(file => ({
       name: file.name,
       size: `${Math.round(file.size / 1024)}kb`,
