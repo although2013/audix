@@ -25,3 +25,4 @@ serde_json = "1"
 
 whisper-rs = { path = "../../whisper-rs", features = ["cuda"] }
 hound = "3.5.0"
+tauri-plugin-store = "2"

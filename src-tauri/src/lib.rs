@@ -1,8 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use tauri::{command, AppHandle, Emitter};
-use whisper_rs::{WhisperContext, FullParams, SamplingStrategy, WhisperContextParameters};
 use hound;
 use serde_json::json;
+use tauri::{command, AppHandle, Emitter};
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use tauri_plugin_store::StoreExt;
 
 fn to_timestamp(t: i64, comma: bool) -> String {
     let mut msec = t * 10;
@@ -25,7 +26,13 @@ fn to_timestamp(t: i64, comma: bool) -> String {
 
 #[command]
 async fn transcribe_audio(app: AppHandle, file_path: String) -> Result<String, String> {
-    let model_path = "C:/Users/altho/source/repos/whisper.cpp/models/ggml-large-v3.bin".to_string();
+    let store = app.store("store.json").unwrap();
+    let model_path = store.get("whisper.model_path")
+                                        .expect("Failed to get value from store")
+                                        .as_str()
+                                        .expect("model_path is not a string")
+                                        .to_string();
+    store.close_resource();
 
     let wav_path = file_path;
 
@@ -40,7 +47,16 @@ async fn transcribe_audio(app: AppHandle, file_path: String) -> Result<String, S
     // see details https://github.com/ggerganov/whisper.cpp/pull/1485#discussion_r1519681143
     // values corresponds to ggml-base.en.bin, result will be the same as with DtwModelPreset::BaseEn
     let custom_aheads = [
-        (7, 0), (10, 17), (12, 18), (13, 12), (16, 1), (17, 14), (19, 11), (21, 4), (24, 1), (25, 6)
+        (7, 0),
+        (10, 17),
+        (12, 18),
+        (13, 12),
+        (16, 1),
+        (17, 14),
+        (19, 11),
+        (21, 4),
+        (24, 1),
+        (25, 6),
     ]
     .map(|(n_text_layer, n_head)| whisper_rs::DtwAhead {
         n_text_layer,
@@ -49,7 +65,6 @@ async fn transcribe_audio(app: AppHandle, file_path: String) -> Result<String, S
     context_param.dtw_parameters.mode = whisper_rs::DtwMode::Custom {
         aheads: &custom_aheads,
     };
-
     let ctx =
         WhisperContext::new_with_params(&model_path, context_param).expect("failed to load model");
     // Create a state
@@ -114,12 +129,14 @@ async fn transcribe_audio(app: AppHandle, file_path: String) -> Result<String, S
         full_text.push_str(&segment_text);
         full_text.push_str("\n");
 
-        let _ = app.emit("transcript-segment", json!({
-            "start": to_timestamp(segment.start_timestamp(), false),
-            "end": to_timestamp(segment.end_timestamp(), false),
-            "text": segment_text
-        }));
-
+        let _ = app.emit(
+            "transcript-segment",
+            json!({
+                "start": to_timestamp(segment.start_timestamp(), false),
+                "end": to_timestamp(segment.end_timestamp(), false),
+                "text": segment_text
+            }),
+        );
 
         // println!(
         //     "[{} - {}]: {}",
@@ -135,10 +152,10 @@ async fn transcribe_audio(app: AppHandle, file_path: String) -> Result<String, S
     Ok(full_text)
 }
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![transcribe_audio])
         .run(tauri::generate_context!())

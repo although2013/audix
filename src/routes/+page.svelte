@@ -25,4 +25,4 @@
     <pre class="text-lg text-gray-700 bg-white rounded p-4 shadow max-w-xl">{transcript}</pre>
   </main>
 </div>
-<link rel="stylesheet" href="/src/styles/global.css">
+
